@@ -25,34 +25,24 @@ RUN gradle build --no-daemon --console=plain \
 # Segunda etapa: imagen final
 FROM eclipse-temurin:21-jre AS runtime
 
-# Instalar Chrome y sus dependencias
+# Instalar Chrome y sus dependencias mínimas
 RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-driver \
-    fonts-freefont-ttf \
+    wget \
+    gnupg \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+    && apt-get update && apt-get install -y \
+    google-chrome-stable \
     xvfb \
-    libgconf-2-4 \
-    libnss3 \
-    libxss1 \
-    libasound2 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libgdk-pixbuf2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxtst6 \
     && rm -rf /var/lib/apt/lists/*
+
+# Descargar ChromeDriver que coincida con la versión de Chrome
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | awk -F'.' '{print $1}') \
+    && wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION.0.6045.105/linux64/chromedriver-linux64.zip" -O /tmp/chromedriver.zip \
+    && unzip /tmp/chromedriver.zip -d /tmp \
+    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
+    && chmod +x /usr/local/bin/chromedriver \
+    && rm -rf /tmp/chromedriver*
 
 WORKDIR /app
 
@@ -71,8 +61,8 @@ COPY --from=build /home/gradle/build/libs/*.jar ./app.jar
 # Variables de entorno necesarias
 ENV BOT_TOKEN=""
 ENV CHAT_ID=""
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV CHROME_BIN=/usr/bin/google-chrome
+ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 ENV DOCKER_ENV=true
 ENV TO_TELEGRAM=true
 ENV DISPLAY=:99
