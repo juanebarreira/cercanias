@@ -54,4 +54,5 @@ ENV CHROME_OPTS="--disable-gpu --no-sandbox --disable-dev-shm-usage --disable-so
 RUN mkdir -p /app/screenshots
 
 # Comando para ejecutar la aplicación
-CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 
+ENTRYPOINT ["java"]
+CMD ["-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Xmx512m", "-XX:+UseG1GC", "-XX:+UseStringDeduplication", "-jar", "app.jar"] 
