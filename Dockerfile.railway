@@ -23,12 +23,7 @@ RUN gradle build --no-daemon --console=plain \
     --exclude-task test
 
 # Segunda etapa: imagen final
-FROM seleniarm/standalone-chromium:latest
-
-# Instalar Java
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jre \
-    && rm -rf /var/lib/apt/lists/*
+FROM markhobson/maven-chrome:jdk-21
 
 WORKDIR /app
 
@@ -47,20 +42,17 @@ COPY --from=build /home/gradle/build/libs/*.jar ./app.jar
 # Variables de entorno necesarias
 ENV BOT_TOKEN=""
 ENV CHAT_ID=""
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
+ENV CHROME_BIN=/usr/bin/google-chrome
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV DOCKER_ENV=true
 ENV TO_TELEGRAM=true
-ENV DISPLAY=:99
 
 # Configuraciones de optimización
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xmx512m -XX:+UseG1GC -XX:+UseStringDeduplication"
 ENV CHROME_OPTS="--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --disable-software-rasterizer --disable-extensions --disable-dev-tools"
 
 # Crear directorio para screenshots
-RUN mkdir -p /app/screenshots && chown -R seluser:seluser /app
-
-USER seluser
+RUN mkdir -p /app/screenshots
 
 # Comando para ejecutar la aplicación
 CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Xmx512m", "-XX:+UseG1GC", "-XX:+UseStringDeduplication", "-jar", "app.jar"] 
