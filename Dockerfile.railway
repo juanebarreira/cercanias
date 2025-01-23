@@ -30,7 +30,16 @@ RUN apt-get update && apt-get install -y \
     chromium \
     chromium-driver \
     xvfb \
-    && rm -rf /var/lib/apt/lists/*
+    dumb-init \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /usr/lib/chromium \
+    && ln -s /usr/bin/chromium /usr/lib/chromium/chrome
+
+# Crear usuario no root
+RUN useradd -m -d /home/chrome chrome \
+    && chown -R chrome:chrome /home/chrome \
+    && mkdir -p /app/screenshots \
+    && chown -R chrome:chrome /app
 
 WORKDIR /app
 
@@ -49,7 +58,7 @@ COPY --from=build /home/gradle/build/libs/*.jar ./app.jar
 # Variables de entorno necesarias
 ENV BOT_TOKEN=""
 ENV CHAT_ID=""
-ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROME_BIN=/usr/lib/chromium/chrome
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV DOCKER_ENV=true
 ENV TO_TELEGRAM=true
@@ -59,12 +68,13 @@ ENV DISPLAY=:99
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xmx512m -XX:+UseG1GC -XX:+UseStringDeduplication"
 ENV CHROME_OPTS="--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --disable-software-rasterizer --disable-extensions --disable-dev-tools"
 
-# Crear directorio para screenshots
-RUN mkdir -p /app/screenshots
-
 # Script de inicio
 RUN echo '#!/bin/sh\nXvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &\nexec java $JAVA_OPTS -jar app.jar' > /app/start.sh \
-    && chmod +x /app/start.sh
+    && chmod +x /app/start.sh \
+    && chown chrome:chrome /app/start.sh
 
-# Comando para ejecutar la aplicación
+USER chrome
+
+# Usar dumb-init como entrypoint para manejar señales correctamente
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/app/start.sh"] 
