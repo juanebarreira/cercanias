@@ -4,4 +4,4 @@ dockerfilePath = "Dockerfile.railway"
 
 [deploy]
 startCommand = "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xmx512m -XX:+UseG1GC -XX:+UseStringDeduplication -jar app.jar"
-cronSchedule = "19,29,39 8 * * 2,3"  # 8:19, 8:29, 8:39 UTC (9:19, 9:29, 9:39 Madrid) 
+cronSchedule = "19,29,39 8 * * 2,3"  # 8:19, 8:29, 8:39 UTC (9:19, 9:29, 9:39 Madrid)
