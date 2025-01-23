@@ -1,0 +1,43 @@
+FROM arm64v8/gradle:8.5.0-jdk17
+
+# Instalar Chromium y sus dependencias
+RUN apt-get update && apt-get install -y \
+    chromium-browser \
+    chromium-chromedriver \
+    fonts-freefont-ttf \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Variables de entorno necesarias
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV DOCKER_ENV=true
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+ENV DISPLAY=:99
+
+# Configuraciones de optimización
+ENV CHROME_OPTS="--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --disable-software-rasterizer --disable-extensions --disable-dev-tools"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xmx512m -XX:+UseG1GC -XX:+UseStringDeduplication"
+
+# Crear directorio para screenshots
+RUN mkdir -p /app/screenshots
+
+# Copiar solo los archivos necesarios para la dependencias primero
+COPY build.gradle.kts settings.gradle.kts ./
+COPY gradle gradle
+COPY gradlew .
+
+# Descargar dependencias (esto se cacheará si no cambian los archivos de gradle)
+RUN gradle dependencies --no-daemon
+
+# Ahora copiar el código fuente
+COPY src src
+
+# Compilar
+RUN gradle build --no-daemon --exclude-task test
+
+# Comando para ejecutar la aplicación
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset & java $JAVA_OPTS -jar app.jar"]

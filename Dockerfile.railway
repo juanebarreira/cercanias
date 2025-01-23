@@ -55,4 +55,4 @@ ENV CHROME_OPTS="--headless=new --no-sandbox --disable-dev-shm-usage --disable-g
 RUN mkdir -p /app/screenshots
 
 # Comando para ejecutar la aplicación
-CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Xmx512m", "-XX:+UseG1GC", "-XX:+UseStringDeduplication", "-jar", "app.jar"] 
+CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Xmx512m", "-XX:+UseG1GC", "-XX:+UseStringDeduplication", "-jar", "app.jar"]

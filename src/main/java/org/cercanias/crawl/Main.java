@@ -5,6 +5,8 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.*;
 import org.openqa.selenium.support.ui.*;
 import java.time.Duration;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.io.File;
@@ -15,95 +17,55 @@ public class Main {
     private static final String URL = "https://www.renfe.com/es/es/cercanias/cercanias-madrid/horarios";
     private static WebDriver driver;
     private static WebDriverWait wait;
+    private static boolean initialized = false;
 
-    public static void main(String[] args) {
-        try {
+    public static synchronized void init() {
+        if (!initialized) {
             initializeDriver();
-            List<Train> trains = searchTrainsInRange("Aravaca", "Recoletos", "08:30", "9:00", "35");
+            initialized = true;
+        }
+    }
 
-            StringBuilder message = new StringBuilder("🚂 Trenes disponibles:\n\n");
-            trains.forEach(train -> message.append(train.telegramFormat()));
-            boolean toTelegram = System.getenv("TO_TELEGRAM") != null;
-            if(toTelegram) {
-                String token = System.getenv("BOT_TOKEN");
-                String chatId = System.getenv("CHAT_ID");
-                if (token == null || chatId == null) {
-                    throw new RuntimeException("BOT_TOKEN y CHAT_ID deben estar configurados en las variables de entorno");
-                }
-                TelegramNotifier telegramNotifier = new TelegramNotifier(token, chatId);
-                telegramNotifier.sendMessage(message.toString());
-            }else{
-                System.out.println(message.toString());
-            }
-        } catch (Exception e) {
-            System.err.println("Error en la ejecución: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
+    public static synchronized void cleanup() {
+        if (initialized && driver != null) {
+            driver.quit();
+            initialized = false;
+        }
+    }
+
+    public static List<Train> searchTrainsInRange(String origin, String destination) throws InterruptedException {
+        try {
+            init();  // Asegurar que el driver está inicializado
+            String startTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+            return searchTrainsInRange(origin, destination, startTime);
         } finally {
-            if (driver != null) {
-                driver.quit();
-            }
+            cleanup();  // Limpiar recursos después de la búsqueda
         }
     }
 
-    private static void initializeDriver() {
-        ChromeOptions options = new ChromeOptions();
-
-        // Configuraciones básicas
-        options.addArguments("--headless=new");
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--disable-software-rasterizer");
-        options.addArguments("--disable-extensions");
-        options.addArguments("--disable-web-security");
-        options.addArguments("--remote-debugging-port=9222");
-        options.addArguments("--window-size=1920,1080");
-
-        // Detectar si estamos en Docker
-        boolean isDocker = System.getenv("DOCKER_ENV") != null;
-
+    public static List<Train> searchTrainsInRange(String origin, String destination, String startTime) throws InterruptedException {
         try {
-            if (isDocker) {
-                String chromeBinary = System.getenv("CHROME_BIN");
-                if (chromeBinary != null) {
-                    options.setBinary(chromeBinary);
-                }
-
-                ChromeDriverService service = new ChromeDriverService.Builder()
-                        .usingDriverExecutable(new File(System.getenv("CHROMEDRIVER_PATH")))
-                        .usingAnyFreePort()
-                        .build();
-
-                driver = new ChromeDriver(service, options);
-            } else {
-                WebDriverManager.chromedriver().setup();
-                driver = new ChromeDriver(options);
-            }
-
-            // Configurar timeouts
-            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(30));
-            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
-            driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(30));
-
-            wait = new WebDriverWait(driver, Duration.ofSeconds(30));
-
-        } catch (Exception e) {
-            System.err.println("Error inicializando el driver: " + e.getMessage());
-            if (driver != null) {
-                driver.quit();
-            }
-            throw e;
+            init();
+            String endTime = LocalTime.now().plusHours(1).format(DateTimeFormatter.ofPattern("HH:mm"));
+            return searchTrainsInRange(origin, destination, startTime, endTime);
+        } finally {
+            cleanup();
         }
     }
 
-    private static List<Train> searchTrainsInRange(String origin, String destination, String startTime, String endTime) throws InterruptedException {
-        return searchTrainsInRange(origin, destination, startTime, endTime, null);
+    public static List<Train> searchTrainsInRange(String origin, String destination, String startTime, String endTime) throws InterruptedException {
+        try {
+            init();
+            return searchTrainsInRange(origin, destination, startTime, endTime, null);
+        } finally {
+            cleanup();
+        }
     }
 
-    private static List<Train> searchTrainsInRange(String origin, String destination, String startTime, String endTime, String filterTimeInMinutes) throws InterruptedException {
-        List<Train> trainsInRange = new ArrayList<>();
+    public static List<Train> searchTrainsInRange(String origin, String destination, String startTime, String endTime, String filterTimeInMinutes) throws InterruptedException {
         try {
+            init();
+            List<Train> trainsInRange = new ArrayList<>();
             driver.get(URL);
             System.out.println("Navigating to: " + URL);
 
@@ -205,12 +167,61 @@ public class Main {
                     .filter(train -> train.takesLessThan(filterTimeInMinutes))
                     .collect(Collectors.toList());
 
+            return trainsInRange;
+        } finally {
+            cleanup();
+        }
+    }
+
+    private static void initializeDriver() {
+        ChromeOptions options = new ChromeOptions();
+
+        // Configuraciones básicas
+        options.addArguments("--headless=new");
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--disable-software-rasterizer");
+        options.addArguments("--disable-extensions");
+        options.addArguments("--disable-web-security");
+        options.addArguments("--remote-debugging-port=9222");
+        options.addArguments("--window-size=1920,1080");
+
+        // Detectar si estamos en Docker
+        boolean isDocker = System.getenv("DOCKER_ENV") != null;
+
+        try {
+            if (isDocker) {
+                String chromeBinary = System.getenv("CHROME_BIN");
+                if (chromeBinary != null) {
+                    options.setBinary(chromeBinary);
+                }
+
+                ChromeDriverService service = new ChromeDriverService.Builder()
+                        .usingDriverExecutable(new File(System.getenv("CHROMEDRIVER_PATH")))
+                        .usingAnyFreePort()
+                        .build();
+
+                driver = new ChromeDriver(service, options);
+            } else {
+                WebDriverManager.chromedriver().setup();
+                driver = new ChromeDriver(options);
+            }
+
+            // Configurar timeouts
+            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(30));
+            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
+            driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(30));
+
+            wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+
         } catch (Exception e) {
-            System.err.println("Error during search: " + e.getMessage());
-            takeScreenshot("error_screenshot.png");
+            System.err.println("Error inicializando el driver: " + e.getMessage());
+            if (driver != null) {
+                driver.quit();
+            }
             throw e;
         }
-        return trainsInRange;
     }
 
     private static void takeScreenshot(String filename) {
@@ -221,12 +232,6 @@ public class Main {
             System.out.println("Screenshot saved as: " + destFile.getAbsolutePath());
         } catch (Exception e) {
             System.err.println("Error taking screenshot: " + e.getMessage());
-        }
-    }
-
-    public static void close() {
-        if (driver != null) {
-            driver.quit();
         }
     }
 }

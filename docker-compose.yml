@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - gradle-cache:/home/gradle/.gradle
+      - ./api.telegram.org.pem:/tmp/api.telegram.org.pem
+      - ./init.sh:/init.sh
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DOCKER_ENV=true
+    entrypoint: ["/bin/sh", "/init.sh"]
+    command: ["sh"]
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+    init: true
+
+volumes:
+  gradle-cache:

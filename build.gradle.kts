@@ -25,15 +25,16 @@ dependencies {
     implementation("org.apache.httpcomponents:httpclient:4.5.14")
     implementation("org.apache.httpcomponents:httpcore:4.4.16")
     implementation("org.slf4j:slf4j-simple:2.0.9")
+    implementation("org.json:json:20231013")
 }
 
 application {
-    mainClass.set("org.cercanias.crawl.Main")
+    mainClass.set("org.cercanias.crawl.TelegramBot")
 }
 
 tasks.jar {
     manifest {
-        attributes["Main-Class"] = "org.cercanias.crawl.Main"
+        attributes["Main-Class"] = "org.cercanias.crawl.TelegramBot"
     }
     
     // Incluir todas las dependencias en el jar

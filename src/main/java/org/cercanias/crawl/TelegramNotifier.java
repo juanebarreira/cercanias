@@ -17,18 +17,16 @@ import java.nio.charset.StandardCharsets;
 
 public class TelegramNotifier extends TelegramLongPollingBot {
     private final String BOT_TOKEN;
-    private final String CHAT_ID;
 
-    public TelegramNotifier(String botToken, String chatId) {
+    public TelegramNotifier(String botToken) {
         this.BOT_TOKEN = botToken;
-        this.CHAT_ID = chatId;
     }
 
-    public void sendMessage(String message) {
+    public void sendMessage(String message, String chatId) {
         try {
             // Codificar los parámetros de la URL
             String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8.toString());
-            String encodedChatId = URLEncoder.encode(CHAT_ID, StandardCharsets.UTF_8.toString());
+            String encodedChatId = URLEncoder.encode(chatId, StandardCharsets.UTF_8.toString());
             
             String urlString = String.format("https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s",
                 BOT_TOKEN, encodedChatId, encodedMessage);
