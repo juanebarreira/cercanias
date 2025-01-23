@@ -1,18 +1,26 @@
 FROM gradle:8.12.0-jdk21-alpine AS build
 
+# Configurar límites de memoria para Gradle
+ENV GRADLE_OPTS="-Xmx512m -Xms128m"
+
 # Copiar solo los archivos necesarios para la dependencias primero
 COPY build.gradle.kts settings.gradle.kts ./
 COPY gradle gradle
 COPY gradlew .
 
-# Descargar dependencias (esto se cacheará si no cambian los archivos de gradle)
-RUN gradle dependencies --no-daemon
+# Descargar dependencias con límites de memoria
+RUN gradle dependencies --no-daemon --console=plain \
+    -Dorg.gradle.jvmargs="-Xmx512m -XX:+HeapDumpOnOutOfMemoryError" \
+    -Dorg.gradle.workers.max=2
 
 # Ahora copiar el código fuente
 COPY src src
 
-# Compilar
-RUN gradle build --no-daemon --exclude-task test
+# Compilar con límites de memoria
+RUN gradle build --no-daemon --console=plain \
+    -Dorg.gradle.jvmargs="-Xmx512m -XX:+HeapDumpOnOutOfMemoryError" \
+    -Dorg.gradle.workers.max=2 \
+    --exclude-task test
 
 # Segunda etapa: imagen final
 FROM eclipse-temurin:21-jre AS runtime
