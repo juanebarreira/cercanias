@@ -28,21 +28,15 @@ FROM eclipse-temurin:21-jre AS runtime
 # Instalar Chrome y sus dependencias mínimas
 RUN apt-get update && apt-get install -y \
     wget \
+    unzip \
     gnupg \
     && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
     && apt-get update && apt-get install -y \
     google-chrome-stable \
+    chromium-chromedriver \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
-
-# Descargar ChromeDriver que coincida con la versión de Chrome
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | awk -F'.' '{print $1}') \
-    && wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION.0.6045.105/linux64/chromedriver-linux64.zip" -O /tmp/chromedriver.zip \
-    && unzip /tmp/chromedriver.zip -d /tmp \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf /tmp/chromedriver*
 
 WORKDIR /app
 
@@ -62,7 +56,7 @@ COPY --from=build /home/gradle/build/libs/*.jar ./app.jar
 ENV BOT_TOKEN=""
 ENV CHAT_ID=""
 ENV CHROME_BIN=/usr/bin/google-chrome
-ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV DOCKER_ENV=true
 ENV TO_TELEGRAM=true
 ENV DISPLAY=:99
