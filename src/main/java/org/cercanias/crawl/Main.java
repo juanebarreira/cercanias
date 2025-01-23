@@ -20,7 +20,7 @@ public class Main {
         try {
             initializeDriver();
             List<Train> trains = searchTrainsInRange("Aravaca", "Recoletos", "08:30", "9:00", "35");
-            
+
             StringBuilder message = new StringBuilder("🚂 Trenes disponibles:\n\n");
             trains.forEach(train -> message.append(train.telegramFormat()));
             boolean toTelegram = System.getenv("TO_TELEGRAM") != null;
@@ -48,85 +48,46 @@ public class Main {
 
     private static void initializeDriver() {
         ChromeOptions options = new ChromeOptions();
-        
+
         // Configuraciones básicas
         options.addArguments("--headless=new");
-        options.addArguments("--disable-notifications");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
-        
-        // Mejoras de compatibilidad
         options.addArguments("--disable-gpu");
         options.addArguments("--disable-software-rasterizer");
         options.addArguments("--disable-extensions");
         options.addArguments("--disable-web-security");
-        options.addArguments("--allow-running-insecure-content");
-        options.addArguments("--ignore-certificate-errors");
-        
-        // Configuraciones de rendimiento
-        options.addArguments("--disable-logging");
-        options.addArguments("--silent");
-        options.addArguments("--log-level=3");
-        options.addArguments("--disable-infobars");
-        
-        // Configuraciones de ventana y visualización
-        options.addArguments("--window-size=1920,1080");
-        options.addArguments("--start-maximized");
-        options.addArguments("--force-device-scale-factor=1");
-        
-        // Configuración de idioma y localización
-        options.addArguments("--lang=es-ES");
-        options.addArguments("--accept-lang=es-ES");
-        
-        // Configuraciones adicionales para estabilidad
         options.addArguments("--remote-debugging-port=9222");
-        options.addArguments("--disable-background-networking");
-        options.addArguments("--disable-background-timer-throttling");
-        options.addArguments("--disable-backgrounding-occluded-windows");
-        options.addArguments("--disable-breakpad");
-        options.addArguments("--disable-client-side-phishing-detection");
-        options.addArguments("--disable-default-apps");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--disable-features=IsolateOrigins,site-per-process");
-        
-        // User Agent más completo
-        options.addArguments("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        
-        // Configuraciones de caché
-        Map<String, Object> prefs = new HashMap<>();
-        prefs.put("profile.default_content_settings.popups", 0);
-        prefs.put("profile.default_content_setting_values.notifications", 2);
-        prefs.put("profile.default_content_setting_values.automatic_downloads", 1);
-        prefs.put("profile.default_content_settings.geolocation", 2);
-        options.setExperimentalOption("prefs", prefs);
-        
+        options.addArguments("--window-size=1920,1080");
+
         // Detectar si estamos en Docker
         boolean isDocker = System.getenv("DOCKER_ENV") != null;
-        
+
         try {
             if (isDocker) {
                 String chromeBinary = System.getenv("CHROME_BIN");
                 if (chromeBinary != null) {
                     options.setBinary(chromeBinary);
                 }
-                System.setProperty("webdriver.chrome.driver", "/usr/bin/chromedriver");
+
+                ChromeDriverService service = new ChromeDriverService.Builder()
+                        .usingDriverExecutable(new File(System.getenv("CHROMEDRIVER_PATH")))
+                        .usingAnyFreePort()
+                        .build();
+
+                driver = new ChromeDriver(service, options);
             } else {
                 WebDriverManager.chromedriver().setup();
+                driver = new ChromeDriver(options);
             }
-            
-            driver = new ChromeDriver(options);
-            
-            // Configurar timeouts más largos para Docker
-            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(isDocker ? 20 : 10));
-            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(isDocker ? 60 : 30));
-            driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(isDocker ? 60 : 30));
-            
-            // Configurar wait con timeout más largo para Docker
-            wait = new WebDriverWait(driver, Duration.ofSeconds(isDocker ? 60 : 30));
-            
-            // Maximizar ventana
-            driver.manage().window().maximize();
-            
+
+            // Configurar timeouts
+            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(30));
+            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
+            driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(30));
+
+            wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+
         } catch (Exception e) {
             System.err.println("Error inicializando el driver: " + e.getMessage());
             if (driver != null) {
@@ -148,7 +109,7 @@ public class Main {
 
             // 1. Reducir espera inicial a 2s
             Thread.sleep(2000);
-            
+
             // Wait for page to load completely
             wait.until(ExpectedConditions.jsReturnsValue("return document.readyState === 'complete'"));
             System.out.println("Page loaded completely");
@@ -168,11 +129,11 @@ public class Main {
             wait.until(ExpectedConditions.presenceOfElementLocated(By.id("horariosCercanias")));
             driver.switchTo().frame("horariosCercanias");
             System.out.println("Switched to iframe");
-            
+
             // Esperar a que el formulario esté cargado
             wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("form")));
             System.out.println("Form found");
-            
+
             takeScreenshot("before_select.png");
 
             // 3. Optimizar selección de origen y destino - reducir esperas
@@ -193,9 +154,9 @@ public class Main {
             WebElement searchButton = wait.until(ExpectedConditions.elementToBeClickable(
                     By.cssSelector("a.irf-search-nearness__btn")));
             ((JavascriptExecutor) driver).executeScript(
-                "arguments[0].click(); " +
-                "arguments[0].dispatchEvent(new Event('click', { bubbles: true }));",
-                searchButton
+                    "arguments[0].click(); " +
+                            "arguments[0].dispatchEvent(new Event('click', { bubbles: true }));",
+                    searchButton
             );
             System.out.println("Search button clicked");
             Thread.sleep(1000); // Reducido de 3s a 1s
@@ -203,7 +164,7 @@ public class Main {
             // Esperar a que desaparezca cualquier loading
             try {
                 wait.until(ExpectedConditions.invisibilityOfElementLocated(
-                    By.cssSelector(".loading, .spinner, .loader")
+                        By.cssSelector(".loading, .spinner, .loader")
                 ));
             } catch (Exception e) {
                 System.out.println("No loading indicator found");
@@ -212,7 +173,7 @@ public class Main {
             // 5. Optimizar espera de resultados
             WebElement table = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.id("tablaHorarios")));
-            
+
             // Reducir espera final a 500ms
             Thread.sleep(500);
 
