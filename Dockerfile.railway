@@ -25,16 +25,10 @@ RUN gradle build --no-daemon --console=plain \
 # Segunda etapa: imagen final
 FROM eclipse-temurin:21-jre AS runtime
 
-# Instalar Chrome y sus dependencias mínimas
+# Instalar Chromium y sus dependencias
 RUN apt-get update && apt-get install -y \
-    wget \
-    unzip \
-    gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
-    && apt-get update && apt-get install -y \
-    google-chrome-stable \
-    chromium-chromedriver \
+    chromium \
+    chromium-driver \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
@@ -55,7 +49,7 @@ COPY --from=build /home/gradle/build/libs/*.jar ./app.jar
 # Variables de entorno necesarias
 ENV BOT_TOKEN=""
 ENV CHAT_ID=""
-ENV CHROME_BIN=/usr/bin/google-chrome
+ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV DOCKER_ENV=true
 ENV TO_TELEGRAM=true
@@ -69,13 +63,8 @@ ENV CHROME_OPTS="--headless=new --no-sandbox --disable-dev-shm-usage --disable-g
 RUN mkdir -p /app/screenshots
 
 # Script de inicio
-COPY <<EOF /app/start.sh
-#!/bin/sh
-Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-java \$JAVA_OPTS -jar app.jar
-EOF
-
-RUN chmod +x /app/start.sh
+RUN echo '#!/bin/sh\nXvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &\nexec java $JAVA_OPTS -jar app.jar' > /app/start.sh \
+    && chmod +x /app/start.sh
 
 # Comando para ejecutar la aplicación
 CMD ["/app/start.sh"] 
