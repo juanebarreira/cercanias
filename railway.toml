@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "java $JAVA_OPTS -jar app.jar"
+restartPolicyType = "CRON"
+restartPolicyValue = "19,29,39 8 * * 2,3"  # 8:19, 8:29, 8:39 UTC (9:19, 9:29, 9:39 Madrid) 
