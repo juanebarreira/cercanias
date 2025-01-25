@@ -28,7 +28,15 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copiar el certificado y configurarlo
+COPY www.renfe.com.pem /tmp/
 COPY api.telegram.org.pem /tmp/
+RUN keytool -importcert \
+    -alias renfe \
+    -cacerts \
+    -file /tmp/www.renfe.com.pem \
+    -storepass changeit \
+    -noprompt
+
 RUN keytool -importcert \
     -alias telegram \
     -cacerts \

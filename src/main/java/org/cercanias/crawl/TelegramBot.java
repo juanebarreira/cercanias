@@ -5,7 +5,10 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -22,7 +25,6 @@ public class TelegramBot {
             try {
                 checkUpdates();
                 Thread.sleep(1000); // Esperar 1 segundo entre checks
-                System.out.println("Paso el minuto");
             } catch (Exception e) {
                 System.err.println("Error checking updates: " + e.getMessage());
             }
@@ -34,7 +36,6 @@ public class TelegramBot {
         String response = makeRequest(url);
 
         JSONObject jsonResponse = new JSONObject(response);
-        System.out.println(jsonResponse.toString());
         if (!jsonResponse.getBoolean("ok")) return;
 
         JSONArray updates = jsonResponse.getJSONArray("result");
@@ -69,7 +70,14 @@ public class TelegramBot {
                 String origin = parts[1];
                 String destination = parts[2];
                 List<Train> trains;
-
+                if (!TrainStation.stationExists(origin)) {
+                    sendMessage("La estacion "+origin+" no existe", chatId);
+                    return;
+                }
+                if (!TrainStation.stationExists(destination)) {
+                    sendMessage("La estacion "+origin+" no existe", chatId);
+                    return;
+                }
                 try {
                     switch (parts.length) {
                         case 3: // Solo origen y destino
@@ -103,8 +111,14 @@ public class TelegramBot {
             } catch (Exception e) {
                 sendMessage("Error buscando trenes: " + e.getMessage(), chatId);
             }
+        } else if (text.startsWith("/estaciones")) {
+            List<String> stations = TrainStation.getAllStations();
+            StringBuilder message = new StringBuilder("🚂 Estaciones disponibles:\n\n");
+            stations.forEach(station -> message.append(station).append("\n"));
+            sendMessage(message.toString(), chatId);
         } else if (text.equals("/help")) {
             sendMessage("Comandos disponibles:\n" +
+                    "/estaciones\n" +
                     "/buscar origen destino [hora_inicio] [hora_fin] [tiempo_max]\n" +
                     "Ejemplos:\n" +
                     "1. Próxima hora: /buscar Aravaca Recoletos\n" +

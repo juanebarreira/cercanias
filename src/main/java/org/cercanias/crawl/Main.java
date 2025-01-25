@@ -4,8 +4,8 @@ import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.*;
 import org.openqa.selenium.support.ui.*;
-import java.time.Duration;
-import java.time.LocalTime;
+
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,7 +36,9 @@ public class Main {
     public static List<Train> searchTrainsInRange(String origin, String destination) throws InterruptedException {
         try {
             init();  // Asegurar que el driver está inicializado
-            String startTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDateTime dateTime = LocalDateTime.now(ZoneId.of("Europe/Madrid"));
+            String startTime = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+            System.out.println("Searching for: " + origin + " to " + destination+ " in " + startTime);
             return searchTrainsInRange(origin, destination, startTime);
         } finally {
             cleanup();  // Limpiar recursos después de la búsqueda
@@ -46,7 +48,8 @@ public class Main {
     public static List<Train> searchTrainsInRange(String origin, String destination, String startTime) throws InterruptedException {
         try {
             init();
-            String endTime = LocalTime.now().plusHours(1).format(DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDateTime dateTime = LocalDateTime.now(ZoneId.of("Europe/Madrid")).plusHours(1);
+            String endTime = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"));
             return searchTrainsInRange(origin, destination, startTime, endTime);
         } finally {
             cleanup();
@@ -66,108 +69,143 @@ public class Main {
         try {
             init();
             List<Train> trainsInRange = new ArrayList<>();
-            driver.get(URL);
-            System.out.println("Navigating to: " + URL);
-
-            // 1. Reducir espera inicial a 2s
-            Thread.sleep(2000);
-
-            // Wait for page to load completely
-            wait.until(ExpectedConditions.jsReturnsValue("return document.readyState === 'complete'"));
-            System.out.println("Page loaded completely");
-
-            // 2. Optimizar manejo de cookies - reducir esperas
+            
             try {
-                WebElement cookiesButton = wait.until(ExpectedConditions.elementToBeClickable(
-                        By.id("onetrust-accept-btn-handler")));
-                ((JavascriptExecutor) driver).executeScript("arguments[0].click();", cookiesButton);
-                System.out.println("Cookies accepted");
-                Thread.sleep(1000); // Reducido de 3s a 1s
-            } catch (TimeoutException e) {
-                System.out.println("Cookie dialog not found or already accepted");
-            }
+                driver.get(URL);
+                System.out.println("Navigating to: " + URL);
 
-            // Esperar a que el iframe esté presente y cambiar a él
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.id("horariosCercanias")));
-            driver.switchTo().frame("horariosCercanias");
-            System.out.println("Switched to iframe");
+                // Espera mejorada para la carga inicial de la página
+                wait.until(webDriver -> {
+                    try {
+                        String readyState = ((JavascriptExecutor) webDriver).executeScript("return document.readyState").toString();
+                        boolean isJQueryComplete = (Boolean) ((JavascriptExecutor) webDriver)
+                            .executeScript("return (typeof jQuery !== 'undefined') ? jQuery.active == 0 : true");
+                        boolean areElementsPresent = !webDriver.findElements(By.tagName("body")).isEmpty();
+                        
+                        System.out.println("Page state: " + readyState + 
+                                         ", jQuery complete: " + isJQueryComplete + 
+                                         ", Elements present: " + areElementsPresent);
+                        
+                        return readyState.equals("complete") && isJQueryComplete && areElementsPresent;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                });
+                System.out.println("Page fully loaded and interactive");
 
-            // Esperar a que el formulario esté cargado
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("form")));
-            System.out.println("Form found");
 
-            takeScreenshot("before_select.png");
+                // Espera mejorada para el iframe
 
-            // 3. Optimizar selección de origen y destino - reducir esperas
-            // Seleccionar origen
-            Select originSelect = new Select(wait.until(ExpectedConditions.presenceOfElementLocated(By.name("o"))));
-            originSelect.selectByVisibleText(origin + " ");
-            System.out.println("Origin selected: " + origin);
-            Thread.sleep(500); // Reducido de 2s a 500ms
+                Thread.sleep(3000);
+                WebElement iframe = wait.until(ExpectedConditions.presenceOfElementLocated(By.id("horariosCercanias")));
+                wait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(iframe));
+//                System.out.println("Switched to iframe");
+//                takeScreenshot("page-loaded.png");
 
-            // Seleccionar destino
-            Select destinationSelect = new Select(wait.until(ExpectedConditions.presenceOfElementLocated(By.name("d"))));
-            destinationSelect.selectByVisibleText(destination + " ");
-            System.out.println("Destination selected: " + destination);
-            takeScreenshot("after_select.png");
-            Thread.sleep(500); // Reducido de 2s a 500ms
 
-            // 4. Optimizar proceso de búsqueda
-            WebElement searchButton = wait.until(ExpectedConditions.elementToBeClickable(
-                    By.cssSelector("a.irf-search-nearness__btn")));
-            ((JavascriptExecutor) driver).executeScript(
-                    "arguments[0].click(); " +
-                            "arguments[0].dispatchEvent(new Event('click', { bubbles: true }));",
-                    searchButton
-            );
-            System.out.println("Search button clicked");
-            Thread.sleep(1000); // Reducido de 3s a 1s
+                // Espera mejorada para el formulario
+                wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("form")));
+//                System.out.println("Form found");
+//                takeScreenshot("before_select.png");
 
-            // Esperar a que desaparezca cualquier loading
-            try {
-                wait.until(ExpectedConditions.invisibilityOfElementLocated(
-                        By.cssSelector(".loading, .spinner, .loader")
+                // Selección de origen
+                WebElement originElement = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("o")));
+                Select originSelect = new Select(originElement);
+                String originValue = TrainStation.getValue(origin).orElse("");
+                originSelect.selectByValue(originValue);
+//                System.out.println("Origin selected: " + origin);
+
+                // Selección de destino
+                WebElement destinationElement = wait.until(ExpectedConditions.presenceOfElementLocated(By.name("d")));
+                Select destinationSelect = new Select(destinationElement);
+                String destinationValue = TrainStation.getValue(destination).orElse("");
+
+                destinationSelect.selectByValue(destinationValue);
+//                System.out.println("Destination selected: " + destination);
+//                takeScreenshot("after_select.png");
+
+                // Mantener la referencia a originElement para el scroll posterior
+                ((JavascriptExecutor) driver).executeScript(
+                    "arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });",
+                    originElement
+                );
+//                System.out.println("Scrolled to origin element");
+
+                /*// Pequeña pausa para que el scroll termine
+                wait.until(webDriver -> {
+                    Long scrollY = (Long) ((JavascriptExecutor) webDriver)
+                        .executeScript("return window.pageYOffset;");
+                    return scrollY != 0;
+                });*/
+//                takeScreenshot("before_submit.png");
+//                System.out.println("Remover - Antes de hacer click "+new Date());
+                // Click mejorado en el botón de búsqueda
+                WebElement searchButton = wait.until(ExpectedConditions.elementToBeClickable(
+                        By.cssSelector("a.irf-search-nearness__btn")));
+//                System.out.println("Remover - Antes de esperar "+new Date());
+                wait.until(ExpectedConditions.elementToBeClickable(searchButton));
+//                System.out.println("Remover - Encontre. ahora a ejecutar "+new Date());
+                ((JavascriptExecutor) driver).executeScript(
+                        "arguments[0].click(); " +
+                        "arguments[0].dispatchEvent(new Event('click', { bubbles: true }));",
+                        searchButton
+                );
+//                System.out.println("Search button clicked");
+
+//                takeScreenshot("after_submit.png");
+//                System.out.println("Remover - Se clickeo. Ahora a esperar 1: "+new Date());
+
+                // Espera mejorada para los resultados
+                wait.until(ExpectedConditions.or(
+                    ExpectedConditions.invisibilityOfElementLocated(By.cssSelector(".loading")),
+                    ExpectedConditions.invisibilityOfElementLocated(By.cssSelector(".spinner")),
+                    ExpectedConditions.invisibilityOfElementLocated(By.cssSelector(".loader"))
                 ));
-            } catch (Exception e) {
-                System.out.println("No loading indicator found");
-            }
+//                System.out.println("Remover - Se clickeo. Ahora a esperar 2: "+new Date());
+                // Espera mejorada para la tabla de resultados
+                wait.until(ExpectedConditions.and(
+                    ExpectedConditions.presenceOfElementLocated(By.id("tablaHorarios")),
+                    ExpectedConditions.visibilityOfElementLocated(By.id("tablaHorarios"))
+                ));
+//                System.out.println("Table found and visible");
+//                System.out.println("Remover - Se clickeo. Ahora a esperar 3, ya esta la tablaHorarios: "+new Date());
+//                takeScreenshot("with_results.png");
 
-            // 5. Optimizar espera de resultados
-            WebElement table = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                    By.id("tablaHorarios")));
+                // Espera a que los datos de la tabla estén cargados
+                wait.until(webDriver -> !driver.findElements(By.cssSelector("#tablaHorarios tbody tr")).isEmpty());
+//                System.out.println("Table rows loaded");
 
-            // Reducir espera final a 500ms
-            Thread.sleep(500);
+                List<WebElement> rows = driver.findElements(By.cssSelector("#tablaHorarios tbody tr"));
+                List<Train> trains = new ArrayList<>();
 
-            // List to store results
-            List<Train> trains = new ArrayList<>();
+                for (WebElement row : rows) {
+                    try {
+                        wait.until(ExpectedConditions.visibilityOf(row));
+                        String line = row.findElement(By.cssSelector("td[name='codLinea'] span")).getText();
+                        String departureTime = row.findElements(By.cssSelector("td")).get(2).getText();
+                        String arrivalTime = row.findElements(By.cssSelector("td")).get(3).getText();
+                        String travelTime = row.findElement(By.cssSelector("span[id^='idTiempo_']")).getText();
+                        String trainCode = row.findElement(By.cssSelector("span[id^='codigoTren_']")).getText();
 
-            // Get all table rows
-            List<WebElement> rows = driver.findElements(By.cssSelector("#tablaHorarios tbody tr"));
-
-            // Extract information from each row
-            for (WebElement row : rows) {
-                try {
-                    Map<String, String> train = new HashMap<>();
-                    String line = row.findElement(By.cssSelector("td[name='codLinea'] span")).getText();
-                    String departureTime = row.findElements(By.cssSelector("td")).get(2).getText();
-                    String arrivalTime = row.findElements(By.cssSelector("td")).get(3).getText();
-                    String travelTime = row.findElement(By.cssSelector("span[id^='idTiempo_']")).getText();
-                    String trainCode = row.findElement(By.cssSelector("span[id^='codigoTren_']")).getText();
-
-                    trains.add(new Train(line, origin, destination, departureTime, arrivalTime, travelTime, trainCode));
-
-                } catch (Exception e) {
-                    System.out.println("Error processing row: " + e.getMessage());
-                    continue;
+                        trains.add(new Train(line, origin, destination, departureTime, arrivalTime, travelTime, trainCode));
+                    } catch (Exception e) {
+                        System.out.println("Error processing row: " + e.getMessage());
+                        continue;
+                    }
                 }
-            }
-            trainsInRange = trains.stream()
-                    .filter(train -> train.departsInRange(startTime, endTime))
-                    .filter(train -> train.takesLessThan(filterTimeInMinutes))
-                    .collect(Collectors.toList());
 
-            return trainsInRange;
+                trainsInRange = trains.stream()
+                        .filter(train -> train.departsInRange(startTime, endTime))
+                        .filter(train -> train.takesLessThan(filterTimeInMinutes))
+                        .collect(Collectors.toList());
+
+                return trainsInRange;
+
+            } catch (TimeoutException e) {
+                System.err.println("Timeout durante la operación: " + e.getMessage());
+                takeScreenshot("timeout-error.png");
+                throw e;
+            }
         } finally {
             cleanup();
         }
@@ -186,6 +224,12 @@ public class Main {
         options.addArguments("--disable-web-security");
         options.addArguments("--remote-debugging-port=9222");
         options.addArguments("--window-size=1920,1080");
+
+        // Agregar estas opciones para ignorar errores de certificados
+        options.addArguments("--ignore-certificate-errors");
+        options.addArguments("--allow-insecure-localhost");
+        options.addArguments("--ignore-ssl-errors");
+        options.setAcceptInsecureCerts(true);
 
         // Detectar si estamos en Docker
         boolean isDocker = System.getenv("DOCKER_ENV") != null;
